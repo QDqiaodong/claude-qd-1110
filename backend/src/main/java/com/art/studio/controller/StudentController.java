@@ -7,6 +7,7 @@ import com.art.studio.entity.Student;
 import com.art.studio.service.StudentService;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -40,5 +41,11 @@ public class StudentController {
     @PutMapping("/{id}")
     public ApiResponse<Student> update(@PathVariable Long id, @RequestBody Student input) {
         return ApiResponse.success(service.update(id, input));
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ApiResponse.success("学员已删除", null);
     }
 }

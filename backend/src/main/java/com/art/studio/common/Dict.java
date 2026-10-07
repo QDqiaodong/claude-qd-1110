@@ -32,6 +32,13 @@ public final class Dict {
     /** 课程状态流转：待上课 → 已上课（签到）；待上课 → 已取消（取消） */
     public static final List<String> COURSE_FLOW = List.of("待上课", "已上课", "已取消");
 
+    // ---------------- 课后成果记录 ----------------
+    /** 草稿 / 已提交 / 已归档 */
+    public static final List<String> RECORD_STATUS = List.of("草稿", "已提交", "已归档");
+
+    /** 记录状态流转：草稿 → 已提交（提交）；已提交 → 已归档（归档）；已归档为终态只读 */
+    public static final List<String> RECORD_FLOW = List.of("草稿", "已提交", "已归档");
+
     // ---------------- 取值方法 ----------------
 
     public static boolean isValidStudentLevel(String level) {
@@ -54,6 +61,10 @@ public final class Dict {
         return status != null && COURSE_STATUS.contains(status);
     }
 
+    public static boolean isValidRecordStatus(String status) {
+        return status != null && RECORD_STATUS.contains(status);
+    }
+
     /**
      * 课程状态机前进：待上课可签到(已上课)或取消(已取消)，已上课/已取消为终态。
      */
@@ -62,5 +73,18 @@ public final class Dict {
             return false;
         }
         return "已上课".equals(to) || "已取消".equals(to);
+    }
+
+    /**
+     * 成果记录状态机前进：草稿可提交(已提交)，已提交可归档(已归档)，已归档为终态。
+     */
+    public static boolean canTransferRecord(String from, String to) {
+        if ("草稿".equals(from)) {
+            return "已提交".equals(to);
+        }
+        if ("已提交".equals(from)) {
+            return "已归档".equals(to);
+        }
+        return false;
     }
 }

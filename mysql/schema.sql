@@ -15,6 +15,7 @@ CREATE DATABASE IF NOT EXISTS art_studio
 USE art_studio;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS course_record;
 DROP TABLE IF EXISTS material_use;
 DROP TABLE IF EXISTS course_schedule;
 DROP TABLE IF EXISTS art_material;
@@ -68,6 +69,25 @@ CREATE TABLE material_use (
     CONSTRAINT fk_mu_material FOREIGN KEY (material_id) REFERENCES art_material (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ---------------- 课后成果记录（一课次仅一份；依附课次与学员） ----------------
+CREATE TABLE course_record (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    schedule_id     BIGINT NOT NULL COMMENT '课次 id',
+    student_id      BIGINT NOT NULL COMMENT '学员 id（取课次上的学员，落库留痕）',
+    work_topic      VARCHAR(128) COMMENT '本次作品主题（草稿可空，提交必填）',
+    completion      INT COMMENT '完成度 0-100（草稿可空，提交必填）',
+    teacher_comment VARCHAR(1000) COMMENT '教师点评（草稿可空，提交必填）',
+    next_practice   VARCHAR(1000) COMMENT '下次练习（选填）',
+    status          VARCHAR(16) NOT NULL COMMENT '草稿 / 已提交 / 已归档',
+    submitted_at    DATETIME COMMENT '提交时间',
+    archived_at     DATETIME COMMENT '归档时间',
+    created_at      DATETIME COMMENT '创建时间',
+    updated_at      DATETIME COMMENT '最后更新时间',
+    UNIQUE KEY uk_cr_schedule (schedule_id) COMMENT '同一课次只能有一份记录（并发收口的最后防线）',
+    CONSTRAINT fk_cr_schedule FOREIGN KEY (schedule_id) REFERENCES course_schedule (id),
+    CONSTRAINT fk_cr_student FOREIGN KEY (student_id) REFERENCES student (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ---------------------------------------------------------------------
 -- 种子数据（含休学 / 结业 / 停用 / 待上课 / 已取消 等异常态，便于审计点检）
 -- ---------------------------------------------------------------------
@@ -102,3 +122,10 @@ INSERT IGNORE INTO material_use (student_id, material_id, qty, use_date, created
 (2, 3, 1, CURDATE(), NOW()),
 (5, 4, 3, CURDATE(), NOW()),
 (6, 1, 1, CURDATE(), NOW());
+
+-- 课次 3（成人油画基础 · 已上课）自带一份已归档成果记录，用于详情/档案展示
+INSERT IGNORE INTO course_record
+    (schedule_id, student_id, work_topic, completion, teacher_comment, next_practice, status, submitted_at, archived_at, created_at, updated_at)
+VALUES
+    (3, 2, '静物：苹果与陶罐', 85, '色调关系基本准确，暗部再透气些会更通透。', '下周练习单色明暗稿两张，注意边缘虚实。',
+     '已归档', NOW(), NOW(), NOW(), NOW());
