@@ -13,7 +13,6 @@ RUN mvn -s settings.xml -B -q dependency:go-offline
 
 COPY src ./src
 RUN mvn -s settings.xml -B -q package -DskipTests
-
 # ===== 运行阶段 =====
 ARG DOCKER_REGISTRY=docker.io/library/
 FROM ${DOCKER_REGISTRY}eclipse-temurin:17-jre

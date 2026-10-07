@@ -11,6 +11,7 @@ import com.art.studio.repository.CourseScheduleRepository;
 import com.art.studio.repository.StudentRepository;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseScheduleService {
@@ -36,6 +37,7 @@ public class CourseScheduleService {
         return repo.findAll();
     }
 
+    @Transactional
     public CourseSchedule create(CourseSchedule input) {
         if (input.studentId == null) {
             throw new BizException("排课必须指定学员");
@@ -76,8 +78,9 @@ public class CourseScheduleService {
         return repo.save(s);
     }
 
+    @Transactional
     public CourseSchedule cancel(Long id) {
-        CourseSchedule c = repo.findById(id).orElseThrow(() -> new BizException("排课记录不存在：" + id));
+        CourseSchedule c = repo.findByIdForUpdate(id).orElseThrow(() -> new BizException("排课记录不存在：" + id));
         if (!"待上课".equals(c.status)) {
             throw new BizException("只有「待上课」的课程可以取消（当前为「" + c.status + "」）");
         }
@@ -85,8 +88,9 @@ public class CourseScheduleService {
         return repo.save(c);
     }
 
+    @Transactional
     public CourseSchedule checkin(Long id) {
-        CourseSchedule c = repo.findById(id).orElseThrow(() -> new BizException("排课记录不存在：" + id));
+        CourseSchedule c = repo.findByIdForUpdate(id).orElseThrow(() -> new BizException("排课记录不存在：" + id));
         if (!"待上课".equals(c.status)) {
             throw new BizException("只有「待上课」的课程可以签到上课（当前为「" + c.status + "」）");
         }

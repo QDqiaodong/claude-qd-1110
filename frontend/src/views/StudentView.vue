@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '../api'
+import AfterClassRecordDialog from '../components/AfterClassRecordDialog.vue'
 
 const emit = defineEmits(['changed'])
 
@@ -16,6 +17,11 @@ const drawerVisible = ref(false)
 const currentStudent = ref(null)
 const schedules = ref([])
 const scheduleLoading = ref(false)
+const records = ref([])
+const recordLoading = ref(false)
+const completedSchedulesOnly = ref(false)
+const recordDialogVisible = ref(false)
+const activeScheduleId = ref(null)
 
 const schDialog = ref(false)
 const schForm = reactive({ courseName: '', date: '', startTime: '09:00', endTime: '10:00' })
@@ -30,6 +36,8 @@ const fmtMin = (n) => {
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0')
 }
 const statusType = (s) => ({ '在读': 'success', '休学': 'warning', '结业': 'info' }[s] || '')
+const recordType = (s) => ({ 草稿: 'warning', 已提交: 'success', 已归档: 'info' }[s] || 'info')
+const fmtTime = (t) => t ? String(t).replace('T', ' ').slice(0, 16) : '—'
 
 async function load() {
   loading.value = true
@@ -54,19 +62,55 @@ async function saveStudent() {
     else await api.createStudent({ ...form })
     ElMessage.success('已保存')
     dialogVisible.value = false
-    await load(); emit('changed')
+    await load()
+    if (currentStudent.value && currentStudent.value.id === form.id) {
+      currentStudent.value = students.value.find((s) => s.id === form.id) || currentStudent.value
+    }
+    emit('changed')
   } catch (e) { ElMessage.error(e.message) }
 }
 
 async function openDrawer(row) {
   currentStudent.value = row
   drawerVisible.value = true
-  await loadSchedules(row.id)
+  completedSchedulesOnly.value = false
+  await Promise.all([loadSchedules(row.id), loadRecords(row.id)])
 }
 
 async function loadSchedules(studentId) {
   scheduleLoading.value = true
-  try { schedules.value = await api.listCourseSchedules(studentId) } catch (e) { ElMessage.error(e.message) } finally { scheduleLoading.value = false }
+  try {
+    schedules.value = await api.listCourseSchedules(
+      studentId,
+      null,
+      null,
+      completedSchedulesOnly.value || null
+    )
+  } catch (e) { ElMessage.error(e.message) } finally { scheduleLoading.value = false }
+}
+
+async function loadRecords(studentId) {
+  recordLoading.value = true
+  try { records.value = await api.listStudentAfterClassRecords(studentId) }
+  catch (e) { ElMessage.error(e.message) } finally { recordLoading.value = false }
+}
+
+async function reloadStudentRecords() {
+  if (!currentStudent.value) return
+  await Promise.all([
+    loadSchedules(currentStudent.value.id),
+    loadRecords(currentStudent.value.id)
+  ])
+  emit('changed')
+}
+
+function openRecord(row) {
+  if (row.status !== '已上课') {
+    ElMessage.warning(`课次当前为「${row.status}」，只有「已上课」后才能新建或提交课后记录。`)
+    return
+  }
+  activeScheduleId.value = row.id
+  recordDialogVisible.value = true
 }
 
 function addSchedule() {
@@ -156,26 +200,58 @@ onMounted(load)
 
         <div class="drawer-head">
           <span>课程排期（{{ schedules.length }}）</span>
-          <el-button type="primary" size="small" @click="addSchedule">排课</el-button>
+          <div>
+            <el-checkbox v-model="completedSchedulesOnly" size="small" @change="loadSchedules(currentStudent.id)">仅已完成</el-checkbox>
+            <el-button type="primary" size="small" @click="addSchedule">排课</el-button>
+          </div>
         </div>
 
         <el-table :data="schedules" v-loading="scheduleLoading" border size="small">
-          <el-table-column prop="courseName" label="课程" />
-          <el-table-column prop="date" label="日期" width="100" />
-          <el-table-column label="时段" width="110">
+          <el-table-column prop="courseName" label="课程" min-width="110" />
+          <el-table-column prop="date" label="日期" width="96" />
+          <el-table-column label="时段" width="100">
             <template #default="{ row }">{{ fmtMin(row.startMin) }}–{{ fmtMin(row.endMin) }}</template>
           </el-table-column>
-          <el-table-column label="状态" width="90">
+          <el-table-column label="状态" width="82">
             <template #default="{ row }"><el-tag :type="statusType(row.status)">{{ row.status }}</el-tag></template>
           </el-table-column>
-          <el-table-column label="操作" width="96">
+          <el-table-column label="课后记录" min-width="135">
+            <template #default="{ row }">
+              <el-tag v-if="row.recordStatus" :type="recordType(row.recordStatus)" size="small">{{ row.recordStatus }}</el-tag>
+              <span v-else class="muted">—</span>
+              <div class="record-time">{{ fmtTime(row.recordUpdatedAt) }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="136">
             <template #default="{ row }">
               <el-button v-if="row.status === '待上课'" link type="success" size="small" @click="checkinSchedule(row)">上课</el-button>
               <el-button v-if="row.status === '待上课'" link type="danger" size="small" @click="cancelSchedule(row)">取消</el-button>
+              <el-button link type="primary" size="small" @click="openRecord(row)">记录</el-button>
             </template>
           </el-table-column>
         </el-table>
         <p v-if="currentStudent.status !== '在读'" class="tip">该学员当前非「在读」，无法继续排课。</p>
+
+        <div class="drawer-head">
+          <span>课后成果记录（{{ records.length }}）</span>
+          <span class="tip inline">仅已提交 / 已归档计入结课</span>
+        </div>
+        <el-table :data="records" v-loading="recordLoading" border size="small">
+          <el-table-column prop="courseName" label="课程" min-width="110" />
+          <el-table-column prop="scheduleDate" label="课次日期" width="96" />
+          <el-table-column label="状态" width="82">
+            <template #default="{ row }"><el-tag :type="recordType(row.status)" size="small">{{ row.status }}</el-tag></template>
+          </el-table-column>
+          <el-table-column label="最后更新" min-width="128">
+            <template #default="{ row }">{{ fmtTime(row.updatedAt) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="70">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="openRecord({ id: row.scheduleId, status: row.scheduleStatus })">查看</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <p v-if="!recordLoading && records.length === 0" class="tip">暂无课后成果记录；草稿提交后才会计入已完成课程。</p>
       </template>
 
       <el-dialog v-model="schDialog" title="排课" width="360px" append-to-body>
@@ -190,6 +266,13 @@ onMounted(load)
           <el-button type="primary" @click="saveSchedule">排课</el-button>
         </template>
       </el-dialog>
+
+      <AfterClassRecordDialog
+        v-model="recordDialogVisible"
+        :schedule-id="activeScheduleId"
+        append-to-body
+        @saved="reloadStudentRecords"
+      />
     </el-drawer>
   </div>
 </template>
@@ -200,4 +283,6 @@ onMounted(load)
 .row-clickable { cursor: pointer; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; margin: 18px 0 10px; font-weight: 600; }
 .tip { color: var(--muted); font-size: 12px; margin-top: 10px; }
+.tip.inline { margin: 0; font-weight: 400; }
+.record-time { color: var(--muted); font-size: 12px; margin-top: 4px; }
 </style>

@@ -17,6 +17,7 @@ USE art_studio;
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS material_use;
+DROP TABLE IF EXISTS after_class_record;
 DROP TABLE IF EXISTS course_schedule;
 DROP TABLE IF EXISTS art_material;
 DROP TABLE IF EXISTS student;
@@ -55,6 +56,26 @@ CREATE TABLE course_schedule (
     status       VARCHAR(16) COMMENT '待上课 / 已上课 / 已取消',
     created_at   DATETIME COMMENT '创建时间',
     CONSTRAINT fk_cs_student FOREIGN KEY (student_id) REFERENCES student (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------- 课后成果记录（一课次一份；草稿 / 已提交 / 已归档） ----------------
+CREATE TABLE after_class_record (
+    id                 BIGINT AUTO_INCREMENT PRIMARY KEY,
+    schedule_id        BIGINT NOT NULL COMMENT '课次 id',
+    student_id         BIGINT NOT NULL COMMENT '学员 id（快照为课次学员，供档案索引）',
+    artwork_theme      VARCHAR(128) COMMENT '本次作品主题',
+    completion_percent INT COMMENT '完成度（0-100）',
+    teacher_comment    VARCHAR(1000) COMMENT '教师点评',
+    next_practice      VARCHAR(500) COMMENT '下次练习',
+    status             VARCHAR(16) NOT NULL COMMENT '草稿 / 已提交 / 已归档',
+    submitted_at       DATETIME COMMENT '提交时间',
+    archived_at        DATETIME COMMENT '归档时间',
+    created_at         DATETIME NOT NULL COMMENT '创建时间',
+    updated_at         DATETIME NOT NULL COMMENT '最后更新时间',
+    UNIQUE KEY uk_acr_schedule (schedule_id),
+    KEY idx_acr_student_updated (student_id, updated_at),
+    CONSTRAINT fk_acr_schedule FOREIGN KEY (schedule_id) REFERENCES course_schedule (id),
+    CONSTRAINT fk_acr_student FOREIGN KEY (student_id) REFERENCES student (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------- 领用记录（主从：依赖学员 + 画材） ----------------

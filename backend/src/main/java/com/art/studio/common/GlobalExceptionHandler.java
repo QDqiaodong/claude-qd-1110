@@ -47,6 +47,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleIntegrity(DataIntegrityViolationException e) {
+        String message = e.getMostSpecificCause() == null ? "" : e.getMostSpecificCause().getMessage();
+        if (message.contains("uk_acr_schedule") || message.contains("after_class_record.schedule_id")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.fail("该课次已有一份课后记录，请勿重复提交"));
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail("存在唯一性约束冲突，请检查编号、手机号是否重复"));
     }
 

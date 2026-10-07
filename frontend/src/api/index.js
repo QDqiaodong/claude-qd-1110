@@ -37,12 +37,23 @@ export default {
   updateArtMaterial: (id, d) => call(http.put(`/art-materials/${id}`, d)),
 
   // ---------------- 课程排期 ----------------
-  listCourseSchedules: (studentId, status) => call(http.get('/course-schedules', params(
-    studentId ? { studentId, ...(status ? { status } : {}) }
-              : (status ? { status } : {})))),
+  listCourseSchedules: (studentId, status, recordStatus, completedOnly) => call(http.get('/course-schedules', params({
+    ...(studentId ? { studentId } : {}),
+    ...(status ? { status } : {}),
+    ...(recordStatus ? { recordStatus } : {}),
+    ...(completedOnly ? { completedOnly } : {})
+  }))),
   createCourseSchedule: (d) => call(http.post('/course-schedules', d)),
   cancelCourseSchedule: (id) => call(http.post(`/course-schedules/${id}/cancel`)),
   checkinCourseSchedule: (id) => call(http.post(`/course-schedules/${id}/checkin`)),
+
+  // ---------------- 课后成果记录 ----------------
+  getAfterClassRecord: (scheduleId) => call(http.get(`/course-schedules/${scheduleId}/after-class-record`)),
+  saveAfterClassDraft: (scheduleId, d) => call(http.post(`/course-schedules/${scheduleId}/after-class-record/draft`, d)),
+  submitAfterClassRecord: (scheduleId, d) => call(http.post(`/course-schedules/${scheduleId}/after-class-record/submit`, d)),
+  archiveAfterClassRecord: (scheduleId) => call(http.post(`/course-schedules/${scheduleId}/after-class-record/archive`)),
+  deleteAfterClassDraft: (scheduleId) => call(http.delete(`/course-schedules/${scheduleId}/after-class-record/draft`)),
+  listStudentAfterClassRecords: (studentId) => call(http.get(`/students/${studentId}/after-class-records`)),
 
   // ---------------- 领用记录 ----------------
   listMaterialUses: () => call(http.get('/material-uses')),
